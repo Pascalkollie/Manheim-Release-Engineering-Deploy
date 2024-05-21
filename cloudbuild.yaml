@@ -1,0 +1,71 @@
+steps:
+  - id: 'example BUILD ORCHESTRATOR'
+    name: 'google/cloud-sdk:alpine'
+    entrypoint: 'sh'
+    args: 
+      - '-c'
+      - | 
+        echo "******************************"
+        echo  "      processing ..         "
+        echo  "       Run setup            "
+        echo "******************************"
+        export BRANCH_NAME=$BRANCH_NAME
+        export COMMIT_SHA=$COMMIT_SHA
+        export TAG_NAME=$TAG_NAME
+        
+        mv build/process/*.enc .
+        echo "Done"
+        echo "******************************"
+        gcloud kms decrypt --key "example-build-key" --keyring "example-build-key-ring" --location "global" --plaintext-file keyfile.json --ciphertext-file keyfile.json.enc
+        echo "******************************"
+        echo "Running build process"
+        
+        echo "$BRANCH_NAME"
+        echo "******************************"
+        case $BRANCH_NAME in
+            master)
+                echo "Deploying to PROD...."
+                gcloud config set  project "example-prod"
+                BUCKET_NAME="example.com"
+                if ! gsutil ls gs://$BUCKET_NAME; then
+                  gsutil mb gs://$BUCKET_NAME
+                fi
+                gsutil -m rsync -r . "gs://$BUCKET_NAME/"
+                if [ "$TEARDOWN" = "true" ]; then
+                  gsutil rm -r gs://$BUCKET_NAME
+                fi
+                echo "******************************"
+                ;;
+            develop)
+                echo "Deploying to QA...."
+                gcloud config set  project "example-qa"
+                BUCKET_NAME="qa.example.com"
+                if ! gsutil ls gs://$BUCKET_NAME; then
+                  gsutil mb gs://$BUCKET_NAME
+                fi
+                gsutil -m rsync -r . "gs://$BUCKET_NAME/"
+                if [ "$TEARDOWN" = "true" ]; then
+                  gsutil rm -r gs://$BUCKET_NAME
+                fi
+                echo "******************************"
+                ;;
+            *)
+                echo "Deploying to DEV...."
+                gcloud config set  project "example-dev"
+                BUCKET_NAME="dev.example.com"
+                if ! gsutil ls gs://$BUCKET_NAME; then
+                  gsutil mb gs://$BUCKET_NAME
+                fi
+                gsutil -m rsync -r . "gs://$BUCKET_NAME/"
+                if [ "$TEARDOWN" = "true" ]; then
+                  gsutil rm -r gs://$BUCKET_NAME
+                fi
+                echo "******************************"
+                ;;
+        esac
+        echo "******************************"
+        echo "            Enjoy"
+        echo "******************************"
+
+variables:
+  TEARDOWN: 'false'
